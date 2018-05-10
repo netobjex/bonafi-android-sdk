@@ -10,7 +10,7 @@ To implement the sdk in your project, you only need to copy the bonafisdk.aar fi
 api(name:'bonafisdk', ext:'aar')
 ```
 
-The [bonafisdk.aar](https://git.xqbator.com/bonafi/android-sdk/blob/master/bonafisdk.iml) file is in the root folder of this project after cloning/downloading it.
+The [bonafisdk.aar](https://git.xqbator.com/bonafi/android-sdk/blob/master/bonafisdk.aar) file is in the root folder of this project after cloning/downloading it.
 
 ### Usage
 
