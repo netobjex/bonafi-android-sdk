@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.netobjex.bonafisdk.constant.Constant;
@@ -31,9 +32,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
 public class NetObjexServices {
-
     private static final String DOMAIN_NAME = "https://api.stg.netobjex.com";
-//    private static final String DOMAIN_NAME = "https://api2.netobjex.com";
     private static final String WEBSERVICE_URL = "/api/PublicAPI";
     private static final String TOKEN_ACTION = "/token";
     private static final String DATA_ACTION = "/getDigitalAssetsByAttributeValue";
@@ -50,16 +49,21 @@ public class NetObjexServices {
     }
 
     public static synchronized void getData(final String name, final String value, final NetObjexWSThread callback) {
+        if (callback == null || TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return;
         getToken(new NetObjexWSToken() {
             @Override
             public void onToken(String data) {
                 Log.d("TAG_D", data);
+                if (data == null || !data.contains("token")) {
+                    callback.onFinish(false, null);
+                    callback.onError("Internal error!");
+                    return;
+                }
                 try {
                     JSONObject res = new JSONObject(data);
                     String token = res.getString("token");
-                    String clientId = res.getString("clientId");
                     String action = getDataAction(name, value);
-                    callPostWS(action, callback, token);
+                    callPostWS(action, token, callback);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -67,13 +71,11 @@ public class NetObjexServices {
         });
     }
 
-    private static String getDataAction(String name, String value){
-        String action = DATA_ACTION+"?name="+name+"&value="+value;
-        Log.d("TAG_D", action);
-        return action;
+    private static String getDataAction(String name, String value) {
+        return DATA_ACTION + "?name=" + name + "&value=" + value;
     }
 
-    private static void callPostWS(final String apiURL, final NetObjexWSThread callback, String token) {
+    private static void callPostWS(final String apiURL, String token, final NetObjexWSThread callback) {
         callService(apiURL, null, false, callback, null, "GET", token);
     }
 
@@ -128,17 +130,14 @@ public class NetObjexServices {
                     response = strBuffer.toString();
                     statusCode = httpResponse.getStatusLine().getStatusCode();
                 } catch (UnsupportedEncodingException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                     response = "";
                     statusCode = 0;
                 } catch (ClientProtocolException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                     response = "";
                     statusCode = 0;
                 } catch (IOException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                     response = "";
                     statusCode = 0;
@@ -174,7 +173,6 @@ public class NetObjexServices {
                     } else {
                         TagModel model = new TagModel();
                         if (aResponse != null) {
-                            model.setHash(aResponse);
                             try {
                                 JSONArray jsonArray = new JSONArray(aResponse);
                                 if (jsonArray.length() == 0) return;
@@ -193,15 +191,18 @@ public class NetObjexServices {
                                 model.setGift(jsonObject.getString("gift"));
                             } catch (JSONException e) {
                                 e.printStackTrace();
+                                if (callback != null) {
+                                    callback.onFinish(false, null);
+                                    callback.onError("Internal Error!\nError: " + e.getMessage());
+                                }
+                                return;
                             }
-                        }
-                        if ((null != aResponse)) {
                             if (callback != null) {
                                 callback.onFinish(true, model);
                             }
                         } else {
                             if (callback != null) {
-                                callback.onFinish(true, model);
+                                callback.onFinish(false, null);
                             }
                         }
                     }
