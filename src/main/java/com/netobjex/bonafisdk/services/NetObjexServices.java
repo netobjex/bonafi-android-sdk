@@ -8,7 +8,6 @@ import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.netobjex.bonafisdk.BuildConfig;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSToken;
 import com.netobjex.bonafisdk.model.TagModel;
@@ -33,27 +32,38 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
 public class NetObjexServices {
+
     private static final String WEBSERVICE_URL = "/api/PublicAPI";
     private static final String TOKEN_ACTION = "/token";
     private static final String DATA_ACTION = "/getDigitalAssetsByAttributeValue";
 
-    private static synchronized void getToken(Context context, NetObjexWSToken callback) {
+    private String baseUrl;
+    private String privateKey;
+    private String clientId;
+
+    public NetObjexServices(String baseUrl, String privateKey, String clientId) {
+        this.baseUrl = baseUrl;
+        this.privateKey = privateKey;
+        this.clientId = clientId;
+    }
+
+    private synchronized void getToken(NetObjexWSToken callback) {
         JSONObject dataObject = new JSONObject();
         try {
-            dataObject.put("privateKey", BuildConfig.PRIVATE_KEY);
-            dataObject.put("clientId", BuildConfig.CLIENT_ID);
+            dataObject.put("privateKey", privateKey);
+            dataObject.put("clientId", clientId);
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        callPostWS(context, TOKEN_ACTION, dataObject.toString(), callback);
+        callPostWS(TOKEN_ACTION, dataObject.toString(), callback);
     }
 
-    public static synchronized void getData(final Context context, final String name, final String value, final NetObjexWSThread callback) {
+    public synchronized void getData(final String name, final String value, final NetObjexWSThread callback) {
         if (callback == null || TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return;
-        getToken(context, new NetObjexWSToken() {
+        getToken(new NetObjexWSToken() {
             @Override
             public void onToken(String data) {
-                Log.d("TAG_D", data);
+//                Log.d("TAG_D", data);
                 if (data == null || !data.contains("token")) {
                     callback.onFinish(false, null);
                     callback.onError("Internal error!");
@@ -63,7 +73,7 @@ public class NetObjexServices {
                     JSONObject res = new JSONObject(data);
                     String token = res.getString("token");
                     String action = getDataAction(name, value);
-                    callPostWS(context, action, token, callback);
+                    callPostWS(action, token, callback);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -75,21 +85,18 @@ public class NetObjexServices {
         return DATA_ACTION + "?name=" + name + "&value=" + value;
     }
 
-    private static void callPostWS(Context context, final String apiURL, String token, final NetObjexWSThread callback) {
-        callService(context, apiURL, null, false, callback, null, "GET", token);
+    private void callPostWS(String apiURL, String token, NetObjexWSThread callback) {
+        callService(apiURL, null, false, callback, null, "GET", token);
     }
 
-    private static void callPostWS(Context context, final String apiURL, final String data, final NetObjexWSToken callback) {
-        callService(context, apiURL, data, true, null, callback, "POST", null);
+    private void callPostWS(String apiURL, String data, NetObjexWSToken callback) {
+        callService(apiURL, data, true, null, callback, "POST", null);
     }
 
-    private static void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
+    private void callService(final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
         Thread callThread = new Thread() {
             @Override
             public void run() {
-                final String DOMAIN_NAME = BuildConfig.BASE_URL;
-                final String PRIVATE_KEY = BuildConfig.PRIVATE_KEY;
-                Log.d("TAG_D",DOMAIN_NAME+" - "+PRIVATE_KEY);
                 final DefaultHttpClient httpClient = new DefaultHttpClient();
                 HttpParams params = httpClient.getParams();
                 HttpConnectionParams.setConnectionTimeout(params, 15000);
@@ -102,7 +109,7 @@ public class NetObjexServices {
                 try {
                     HttpRequestBase httpCall = null;
                     if (type.equalsIgnoreCase("POST")) {
-                        httpCall = new HttpPost(DOMAIN_NAME + WEBSERVICE_URL + action);
+                        httpCall = new HttpPost(baseUrl + WEBSERVICE_URL + action);
                         if (requestedTag != null) {
                             StringEntity se;
                             se = new StringEntity(requestedTag, "UTF-8");
@@ -110,13 +117,13 @@ public class NetObjexServices {
                             ((HttpPost) httpCall).setEntity(se);
                         }
                     } else if (type.equalsIgnoreCase("GET")) {
-                        httpCall = new HttpGet(DOMAIN_NAME + WEBSERVICE_URL + action);
+                        httpCall = new HttpGet(baseUrl + WEBSERVICE_URL + action);
                     }
                     httpCall.setHeader("Accept", "application/json");
                     httpCall.setHeader("Content-Type", "application/json");
                     if (!isTokenRequest && token != null) {
                         httpCall.setHeader("X-Oauth-Token", token);
-                        httpCall.setHeader("X-API-AUTH-KEY", PRIVATE_KEY);
+                        httpCall.setHeader("X-API-AUTH-KEY", privateKey);
                     }
                     HttpResponse httpResponse = httpClient.execute(httpCall);
                     HttpEntity entity = httpResponse.getEntity();
@@ -161,7 +168,7 @@ public class NetObjexServices {
             private final Handler handler = new Handler() {
                 public void handleMessage(Message msg) {
                     String aResponse = msg.getData().getString("response");
-                    Log.d("TAG_D.", aResponse);
+//                    Log.d("TAG_D.", aResponse);
                     if (isTokenRequest) {
                         if ((null != aResponse)) {
                             if (tokenCallback != null) {
@@ -177,30 +184,32 @@ public class NetObjexServices {
                         if (aResponse != null) {
                             try {
                                 JSONArray jsonArray = new JSONArray(aResponse);
-                                if (jsonArray.length() == 0) return;
-                                JSONObject jsonObject = jsonArray.getJSONObject(0);
-                                model.setIdentification(jsonObject.getString("identification"));
-                                model.setCost(jsonObject.getDouble("cost"));
-                                model.setManufacturer(jsonObject.getString("manufacture"));
-                                model.setSerialNo(jsonObject.getString("serial Number"));
-                                model.setDateOfManufacture(jsonObject.getString("Date of Manufacture"));
-                                model.setAuthorizedStore(jsonObject.getString("Authorized STORE"));
-                                model.setPhone(jsonObject.getString("phone"));
-                                model.setDateOfFirstArrivalAtStore(jsonObject.getString("Date of First Arrival at Store"));
-                                model.setDateOfFirstSold(jsonObject.getString("Date of First Sold"));
-                                model.setOriginalOwnerRegistration(jsonObject.getString("Original Owner Registration"));
-                                model.setEmail(jsonObject.getString("email"));
-                                model.setGift(jsonObject.getString("gift"));
+                                boolean isFound = false;
+                                if (jsonArray.length() > 0) {
+                                    JSONObject jsonObject = jsonArray.getJSONObject(0);
+                                    model.setIdentification(jsonObject.getString("identification"));
+                                    model.setCost(jsonObject.getDouble("cost"));
+                                    model.setManufacturer(jsonObject.getString("manufacture"));
+                                    model.setSerialNo(jsonObject.getString("serial Number"));
+                                    model.setDateOfManufacture(jsonObject.getString("Date of Manufacture"));
+                                    model.setAuthorizedStore(jsonObject.getString("Authorized STORE"));
+                                    model.setPhone(jsonObject.getString("phone"));
+                                    model.setDateOfFirstArrivalAtStore(jsonObject.getString("Date of First Arrival at Store"));
+                                    model.setDateOfFirstSold(jsonObject.getString("Date of First Sold"));
+                                    model.setOriginalOwnerRegistration(jsonObject.getString("Original Owner Registration"));
+                                    model.setEmail(jsonObject.getString("email"));
+                                    model.setGift(jsonObject.getString("gift"));
+                                    isFound = true;
+                                }
+                                if (callback != null) {
+                                    callback.onFinish(isFound, model);
+                                }
                             } catch (JSONException e) {
                                 e.printStackTrace();
                                 if (callback != null) {
                                     callback.onFinish(false, null);
                                     callback.onError("Internal Error!\nError: " + e.getMessage());
                                 }
-                                return;
-                            }
-                            if (callback != null) {
-                                callback.onFinish(true, model);
                             }
                         } else {
                             if (callback != null) {
