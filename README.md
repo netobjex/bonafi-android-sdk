@@ -26,8 +26,8 @@ import com.netobjex.bonafisdk.services.NetObjexServices;
 String TAG = "";
 String VALUE = "";
 
-NetObjexServices netObjexServices = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
-netObjexServices.getData(TAG,VALUE, new NetObjexWSThread() {
+NetObjexServices netObjex = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
+netObjex.getData(TAG,VALUE, new NetObjexWSThread() {
     @Override
     public void onFinish(boolean isFound, TagModel data) {
         //isFound is to check if the given parameter matched with any item on the server
