@@ -14,7 +14,7 @@ The [bonafisdk.aar](https://git.xqbator.com/bonafi/android-sdk/blob/master/bonaf
 
 ### Usage
 
-There are two MANDATORY value needed to get information of any given item, which are: Key and Value. 
+After you've been provided the three basic parameter BASE_URL, PRIVATE_KEY & CLIENT_ID, then there are only two MANDATORY value needed to get information of any given item, which are: KEY & VALUE. 
 
 Example
 
@@ -23,21 +23,22 @@ import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 import com.netobjex.bonafisdk.model.TagModel;
 import com.netobjex.bonafisdk.services.NetObjexServices;
 
-    String TAG = "TAG";
-    String VALUE = "XE2P";
+String TAG = "";
+String VALUE = "";
 
-    NetObjexServices.getData(TAG,VALUE, new NetObjexWSThread() {
-        @Override
-        public void onFinish(boolean isFound, TagModel data) {
-            //data contains every information provided from our server about the item with the TAG and its VALUE
-            //isFound is to check if the given parameter matched with any item on the server
-        }
+NetObjexServices netObjexServices = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
+netObjexServices.getData(TAG,VALUE, new NetObjexWSThread() {
+    @Override
+    public void onFinish(boolean isFound, TagModel data) {
+        //isFound is to check if the given parameter matched with any item on the server
+        //data contains every information provided from our server about the item with the TAG and its VALUE
+    }
 
-        @Override
-        public void onError(String errorMsg) {
-
-        }
-    });
+    @Override
+    public void onError(String errorMsg) {
+        
+    }
+});
 ```
 
 ## Prerequisites
