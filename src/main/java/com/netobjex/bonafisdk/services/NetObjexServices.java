@@ -1,13 +1,14 @@
 package com.netobjex.bonafisdk.services;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.netobjex.bonafisdk.constant.Constant;
+import com.netobjex.bonafisdk.BuildConfig;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSToken;
 import com.netobjex.bonafisdk.model.TagModel;
@@ -32,25 +33,24 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
 public class NetObjexServices {
-    private static final String DOMAIN_NAME = "https://api.stg.netobjex.com";
     private static final String WEBSERVICE_URL = "/api/PublicAPI";
     private static final String TOKEN_ACTION = "/token";
     private static final String DATA_ACTION = "/getDigitalAssetsByAttributeValue";
 
-    private static synchronized void getToken(NetObjexWSToken callback) {
+    private static synchronized void getToken(Context context, NetObjexWSToken callback) {
         JSONObject dataObject = new JSONObject();
         try {
-            dataObject.put("privateKey", Constant.PRIVATE_KEY);
-            dataObject.put("clientId", Constant.CLIENT_ID);
+            dataObject.put("privateKey", BuildConfig.PRIVATE_KEY);
+            dataObject.put("clientId", BuildConfig.CLIENT_ID);
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        callPostWS(TOKEN_ACTION, dataObject.toString(), callback);
+        callPostWS(context, TOKEN_ACTION, dataObject.toString(), callback);
     }
 
-    public static synchronized void getData(final String name, final String value, final NetObjexWSThread callback) {
+    public static synchronized void getData(final Context context, final String name, final String value, final NetObjexWSThread callback) {
         if (callback == null || TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return;
-        getToken(new NetObjexWSToken() {
+        getToken(context, new NetObjexWSToken() {
             @Override
             public void onToken(String data) {
                 Log.d("TAG_D", data);
@@ -63,7 +63,7 @@ public class NetObjexServices {
                     JSONObject res = new JSONObject(data);
                     String token = res.getString("token");
                     String action = getDataAction(name, value);
-                    callPostWS(action, token, callback);
+                    callPostWS(context, action, token, callback);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -75,18 +75,21 @@ public class NetObjexServices {
         return DATA_ACTION + "?name=" + name + "&value=" + value;
     }
 
-    private static void callPostWS(final String apiURL, String token, final NetObjexWSThread callback) {
-        callService(apiURL, null, false, callback, null, "GET", token);
+    private static void callPostWS(Context context, final String apiURL, String token, final NetObjexWSThread callback) {
+        callService(context, apiURL, null, false, callback, null, "GET", token);
     }
 
-    private static void callPostWS(final String apiURL, final String data, final NetObjexWSToken callback) {
-        callService(apiURL, data, true, null, callback, "POST", null);
+    private static void callPostWS(Context context, final String apiURL, final String data, final NetObjexWSToken callback) {
+        callService(context, apiURL, data, true, null, callback, "POST", null);
     }
 
-    private static void callService(final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
+    private static void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
         Thread callThread = new Thread() {
             @Override
             public void run() {
+                final String DOMAIN_NAME = BuildConfig.BASE_URL;
+                final String PRIVATE_KEY = BuildConfig.PRIVATE_KEY;
+                Log.d("TAG_D",DOMAIN_NAME+" - "+PRIVATE_KEY);
                 final DefaultHttpClient httpClient = new DefaultHttpClient();
                 HttpParams params = httpClient.getParams();
                 HttpConnectionParams.setConnectionTimeout(params, 15000);
@@ -113,10 +116,9 @@ public class NetObjexServices {
                     httpCall.setHeader("Content-Type", "application/json");
                     if (!isTokenRequest && token != null) {
                         httpCall.setHeader("X-Oauth-Token", token);
-                        httpCall.setHeader("X-API-AUTH-KEY", Constant.PRIVATE_KEY);
+                        httpCall.setHeader("X-API-AUTH-KEY", PRIVATE_KEY);
                     }
-                    HttpResponse httpResponse;
-                    httpResponse = httpClient.execute(httpCall);
+                    HttpResponse httpResponse = httpClient.execute(httpCall);
                     HttpEntity entity = httpResponse.getEntity();
                     inputStream = entity.getContent();
                     int len = (int) httpResponse.getEntity().getContentLength();
@@ -159,7 +161,7 @@ public class NetObjexServices {
             private final Handler handler = new Handler() {
                 public void handleMessage(Message msg) {
                     String aResponse = msg.getData().getString("response");
-                    Log.d("TAG_D", aResponse);
+                    Log.d("TAG_D.", aResponse);
                     if (isTokenRequest) {
                         if ((null != aResponse)) {
                             if (tokenCallback != null) {

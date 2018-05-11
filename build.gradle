@@ -13,6 +13,15 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
     }
+    flavorDimensions 'tier'
+    productFlavors {
+        prod {
+            dimension 'tier'
+            buildConfigField 'String', 'BASE_URL', '"https://api.stg.netobjex.com"'
+            buildConfigField 'String', 'PRIVATE_KEY', '"TbMqnCVmtLQDrfGWDNhgpP7mVVsjPuZz"'
+            buildConfigField 'String', 'CLIENT_ID', '"246e4682-b00b-4953-b704-27eed97fab4d"'
+        }
+    }
 
     buildTypes {
         release {
