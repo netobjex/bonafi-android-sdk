@@ -1,7 +1,6 @@
 package com.netobjex.bonafisdk.services;
 
 import android.annotation.SuppressLint;
-import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -32,11 +31,6 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
 public class NetObjexServices {
-
-    private static final String WEBSERVICE_URL = "/api/PublicAPI";
-    private static final String TOKEN_ACTION = "/token";
-    private static final String DATA_ACTION = "/getDigitalAssetsByAttributeValue";
-
     private String baseUrl;
     private String privateKey;
     private String clientId;
@@ -48,6 +42,7 @@ public class NetObjexServices {
     }
 
     private synchronized void getToken(NetObjexWSToken callback) {
+        final String TOKEN_ACTION = "/token";
         JSONObject dataObject = new JSONObject();
         try {
             dataObject.put("privateKey", privateKey);
@@ -63,10 +58,8 @@ public class NetObjexServices {
         getToken(new NetObjexWSToken() {
             @Override
             public void onToken(String data) {
-//                Log.d("TAG_D", data);
                 if (data == null || !data.contains("token")) {
-                    callback.onFinish(false, null);
-                    callback.onError("Internal error!");
+                    sendErrorCallback(callback, "Internal error!");
                     return;
                 }
                 try {
@@ -82,7 +75,13 @@ public class NetObjexServices {
     }
 
     private static String getDataAction(String name, String value) {
+        final String DATA_ACTION = "/getDigitalAssetsByAttributeValue";
         return DATA_ACTION + "?name=" + name + "&value=" + value;
+    }
+
+    private void sendErrorCallback(NetObjexWSThread callback, String errorMsg){
+        callback.onFinish(false, null);
+        callback.onError(errorMsg);
     }
 
     private void callPostWS(String apiURL, String token, NetObjexWSThread callback) {
@@ -97,6 +96,7 @@ public class NetObjexServices {
         Thread callThread = new Thread() {
             @Override
             public void run() {
+                final String WEBSERVICE_URL = "/api/PublicAPI";
                 final DefaultHttpClient httpClient = new DefaultHttpClient();
                 HttpParams params = httpClient.getParams();
                 HttpConnectionParams.setConnectionTimeout(params, 15000);
@@ -168,7 +168,7 @@ public class NetObjexServices {
             private final Handler handler = new Handler() {
                 public void handleMessage(Message msg) {
                     String aResponse = msg.getData().getString("response");
-//                    Log.d("TAG_D.", aResponse);
+//                    Log.d("TAG_D",aResponse);
                     if (isTokenRequest) {
                         if ((null != aResponse)) {
                             if (tokenCallback != null) {
@@ -203,17 +203,18 @@ public class NetObjexServices {
                                 }
                                 if (callback != null) {
                                     callback.onFinish(isFound, model);
+                                    if (!isFound)
+                                        callback.onError("Item not found");
                                 }
                             } catch (JSONException e) {
                                 e.printStackTrace();
                                 if (callback != null) {
-                                    callback.onFinish(false, null);
-                                    callback.onError("Internal Error!\nError: " + e.getMessage());
+                                    sendErrorCallback(callback, "Internal error!");
                                 }
                             }
                         } else {
                             if (callback != null) {
-                                callback.onFinish(false, null);
+                                sendErrorCallback(callback, "Item not found");
                             }
                         }
                     }

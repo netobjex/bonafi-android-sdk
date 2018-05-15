@@ -130,6 +130,21 @@ public class TagModel {
 
     @Override
     public String toString() {
-        return "TagModel [tag="+tag+"]";
+        return "TagModel{" +
+                "tag='" + tag + '\'' +
+                ", hash='" + hash + '\'' +
+                ", identification='" + identification + '\'' +
+                ", cost=" + cost +
+                ", manufacturer='" + manufacturer + '\'' +
+                ", serialNo='" + serialNo + '\'' +
+                ", dateOfManufacture='" + dateOfManufacture + '\'' +
+                ", authorizedStore='" + authorizedStore + '\'' +
+                ", phone='" + phone + '\'' +
+                ", dateOfFirstArrivalAtStore='" + dateOfFirstArrivalAtStore + '\'' +
+                ", dateOfFirstSold='" + dateOfFirstSold + '\'' +
+                ", originalOwnerRegistration='" + originalOwnerRegistration + '\'' +
+                ", email='" + email + '\'' +
+                ", gift='" + gift + '\'' +
+                '}';
     }
 }
