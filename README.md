@@ -18,16 +18,28 @@ After you've been provided the three basic parameter BASE_URL, PRIVATE_KEY & CLI
 
 Example
 
+In manifest
+
 ```
-import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+<uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+<service android:name="org.eclipse.paho.android.service.MqttService" />
+
+```
+Then
+
+```
 import com.netobjex.bonafisdk.model.TagModel;
 import com.netobjex.bonafisdk.services.NetObjexServices;
+import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 
 String TAG = "";
 String VALUE = "";
 
-NetObjexServices netObjex = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
-netObjex.getData(TAG,VALUE, new NetObjexWSThread() {
+NetObjexServices netObjex = new NetObjexServices(MQTT_SERVER_URI,MQTT_USERNAME, MQTT_PASSWORD, BASE_URL, PRIVATE_KEY, CLIENT_ID);
+netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
     @Override
     public void onFinish(boolean isFound, TagModel data) {
         //isFound is to check if the given parameter matched with any item on the server
@@ -43,6 +55,6 @@ netObjex.getData(TAG,VALUE, new NetObjexWSThread() {
 
 ## Prerequisites
 
-Kindly remember to add internet permission to enable the sdk to access the internet. Pretty easy to use
+Kindly remember to add internet permission to enable the sdk to access the internet
 
 
