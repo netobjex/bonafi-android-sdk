@@ -18,9 +18,9 @@ import java.util.UUID;
 
 public class MQTTHelper {
     public MqttAndroidClient mqttAndroidClient;
-    private String serverUri = "tcp://mq-prod.netobjex.com:1883";
-    private String username = "admin";
-    private String password = "ayVsamhfGZSJvN9";
+    private String serverUri = "";
+    private String username = "";
+    private String password = "";
 
     public MQTTHelper(Context context, String mqttServerUrl, String mqttUsername, String mqttPassword){
         this.serverUri = mqttServerUrl;
