@@ -1,6 +1,7 @@
 package com.netobjex.bonafisdk.services;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -10,6 +11,7 @@ import android.util.Log;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSToken;
 import com.netobjex.bonafisdk.model.TagModel;
+import com.netobjex.bonafisdk.utils.MQTTHelper;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -34,14 +36,20 @@ public class NetObjexServices {
     private String baseUrl;
     private String privateKey;
     private String clientId;
+    public String mqttServerUri;
+    public String mqttUsername;
+    public String mqttPassword;
 
-    public NetObjexServices(String baseUrl, String privateKey, String clientId) {
+    public NetObjexServices(String mqttServerUrl, String mqttUsername, String mqttPassword, String baseUrl, String privateKey, String clientId) {
         this.baseUrl = baseUrl;
         this.privateKey = privateKey;
         this.clientId = clientId;
+        this.mqttServerUri = mqttServerUrl;
+        this.mqttPassword = mqttPassword;
+        this.mqttUsername = mqttUsername;
     }
 
-    private synchronized void getToken(NetObjexWSToken callback) {
+    private synchronized void getToken(Context context, NetObjexWSToken callback) {
         final String TOKEN_ACTION = "/token";
         JSONObject dataObject = new JSONObject();
         try {
@@ -50,12 +58,12 @@ public class NetObjexServices {
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        callPostWS(TOKEN_ACTION, dataObject.toString(), callback);
+        callPostWS(context, TOKEN_ACTION, dataObject.toString(), callback);
     }
 
-    public synchronized void getData(final String name, final String value, final NetObjexWSThread callback) {
+    public synchronized void getData(final Context context, final String name, final String value, final NetObjexWSThread callback) {
         if (callback == null || TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return;
-        getToken(new NetObjexWSToken() {
+        getToken(context, new NetObjexWSToken() {
             @Override
             public void onToken(String data) {
                 if (data == null || !data.contains("token")) {
@@ -66,7 +74,8 @@ public class NetObjexServices {
                     JSONObject res = new JSONObject(data);
                     String token = res.getString("token");
                     String action = getDataAction(name, value);
-                    callPostWS(action, token, callback);
+                    callPostWS(context, action, token, callback);
+                    new MQTTHelper(context, mqttServerUri, mqttUsername, mqttPassword);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -79,20 +88,20 @@ public class NetObjexServices {
         return DATA_ACTION + "?name=" + name + "&value=" + value;
     }
 
-    private void sendErrorCallback(NetObjexWSThread callback, String errorMsg){
+    private void sendErrorCallback(NetObjexWSThread callback, String errorMsg) {
         callback.onFinish(false, null);
         callback.onError(errorMsg);
     }
 
-    private void callPostWS(String apiURL, String token, NetObjexWSThread callback) {
-        callService(apiURL, null, false, callback, null, "GET", token);
+    private void callPostWS(Context context, String apiURL, String token, NetObjexWSThread callback) {
+        callService(context, apiURL, null, false, callback, null, "GET", token);
     }
 
-    private void callPostWS(String apiURL, String data, NetObjexWSToken callback) {
-        callService(apiURL, data, true, null, callback, "POST", null);
+    private void callPostWS(Context context, String apiURL, String data, NetObjexWSToken callback) {
+        callService(context, apiURL, data, true, null, callback, "POST", null);
     }
 
-    private void callService(final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
+    private void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
         Thread callThread = new Thread() {
             @Override
             public void run() {
@@ -168,7 +177,7 @@ public class NetObjexServices {
             private final Handler handler = new Handler() {
                 public void handleMessage(Message msg) {
                     String aResponse = msg.getData().getString("response");
-//                    Log.d("TAG_D",aResponse);
+                    Log.d("TAG_D", aResponse);
                     if (isTokenRequest) {
                         if ((null != aResponse)) {
                             if (tokenCallback != null) {
@@ -187,6 +196,7 @@ public class NetObjexServices {
                                 boolean isFound = false;
                                 if (jsonArray.length() > 0) {
                                     JSONObject jsonObject = jsonArray.getJSONObject(0);
+                                    model.setTag(jsonObject.getString("TAG"));
                                     model.setIdentification(jsonObject.getString("identification"));
                                     model.setCost(jsonObject.getDouble("cost"));
                                     model.setManufacturer(jsonObject.getString("manufacture"));
