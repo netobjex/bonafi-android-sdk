@@ -1,36 +1,47 @@
 package com.netobjex.bonafisdk.services;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
+import org.apache.http.entity.mime.MultipartEntity;
+
 import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
-import com.netobjex.bonafisdk.interfaces.NetObjexWSToken;
+import com.netobjex.bonafisdk.interfaces.NetObjexWSCallback;
 import com.netobjex.bonafisdk.model.TagModel;
 import com.netobjex.bonafisdk.utils.MQTTHelper;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class NetObjexServices {
     private String baseUrl;
@@ -49,7 +60,7 @@ public class NetObjexServices {
         this.mqttUsername = mqttUsername;
     }
 
-    private synchronized void getToken(Context context, NetObjexWSToken callback) {
+    private synchronized void getToken(Context context, NetObjexWSCallback callback) {
         final String TOKEN_ACTION = "/token";
         JSONObject dataObject = new JSONObject();
         try {
@@ -62,10 +73,14 @@ public class NetObjexServices {
     }
 
     public synchronized void getData(final Context context, final String name, final String value, final NetObjexWSThread callback) {
+        if (mqttServerUri != null && !mqttServerUri.contains(".netobjex.com")) {
+            sendErrorCallback(callback, "Unrecognized MQTT Base Url");
+            return;
+        }
         if (callback == null || TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return;
-        getToken(context, new NetObjexWSToken() {
+        getToken(context, new NetObjexWSCallback() {
             @Override
-            public void onToken(String data) {
+            public void onResponse(String data) {
                 if (data == null || !data.contains("token")) {
                     sendErrorCallback(callback, "Internal error!");
                     return;
@@ -97,11 +112,11 @@ public class NetObjexServices {
         callService(context, apiURL, null, false, callback, null, "GET", token);
     }
 
-    private void callPostWS(Context context, String apiURL, String data, NetObjexWSToken callback) {
+    private void callPostWS(Context context, String apiURL, String data, NetObjexWSCallback callback) {
         callService(context, apiURL, data, true, null, callback, "POST", null);
     }
 
-    private void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSToken tokenCallback, final String type, final String token) {
+    private void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSCallback tokenCallback, final String type, final String token) {
         Thread callThread = new Thread() {
             @Override
             public void run() {
@@ -133,6 +148,7 @@ public class NetObjexServices {
                     if (!isTokenRequest && token != null) {
                         httpCall.setHeader("X-Oauth-Token", token);
                         httpCall.setHeader("X-API-AUTH-KEY", privateKey);
+                        httpCall.setHeader("X-DEVICE-ID", getDeviceId(context));
                     }
                     HttpResponse httpResponse = httpClient.execute(httpCall);
                     HttpEntity entity = httpResponse.getEntity();
@@ -181,11 +197,11 @@ public class NetObjexServices {
                     if (isTokenRequest) {
                         if ((null != aResponse)) {
                             if (tokenCallback != null) {
-                                tokenCallback.onToken(aResponse);
+                                tokenCallback.onResponse(aResponse);
                             }
                         } else {
                             if (tokenCallback != null) {
-                                tokenCallback.onToken(null);
+                                tokenCallback.onResponse(null);
                             }
                         }
                     } else {
@@ -232,5 +248,73 @@ public class NetObjexServices {
             };
         };
         callThread.start();
+    }
+
+    private String getDeviceId(Context context) {
+        String id = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+        Log.d("TAG_D", id);
+        return id;
+    }
+
+    private void bulkUpload(final List<String> filesPath, final NetObjexWSCallback callback) {
+        Thread thread = new Thread(){
+            @Override
+            public void run() {
+                String responseStr = null;
+                List<File> files = new ArrayList<>();
+                for (String path : filesPath) {
+                    Log.d("TAG_D", path);
+                    File each = new File(path);
+                    files.add(each);
+                }
+
+                final String WEBSERVICE_URL = "https://api.stg.netobjex.com/api/files/upload";
+                try {
+                    HttpClient client = new DefaultHttpClient();
+                    HttpPost post = new HttpPost(WEBSERVICE_URL);
+
+                    List<FileBody> fileBodies = new ArrayList<>();
+                    for (File file : files) {
+                        FileBody data = new FileBody(file);
+                        fileBodies.add(data);
+                    }
+
+                    MultipartEntity reqEntity = new MultipartEntity();
+
+                    for (FileBody bin : fileBodies) {
+                        reqEntity.addPart(bin.getFilename(), bin);
+                    }
+
+                    reqEntity.addPart("query", new StringBody("COUPON_IMAGE"));
+
+                    post.setEntity(reqEntity);
+                    HttpResponse response = client.execute(post);
+                    HttpEntity resEntity = response.getEntity();
+                    responseStr = EntityUtils.toString(resEntity);
+                    if (resEntity != null) {
+                        Log.i("TAG_D", responseStr);
+                    }
+                } catch (Exception ex) {
+                    Log.e("TAG_D", "error: " + ex.getMessage(), ex);
+                } finally {
+                    Message msgObj = handler.obtainMessage();
+                    Bundle b = new Bundle();
+                    b.putString("response", responseStr);
+                    msgObj.setData(b);
+                    handler.sendMessage(msgObj);
+                }
+            }
+            @SuppressLint("HandlerLeak")
+            private final Handler handler = new Handler() {
+                public void handleMessage(Message msg) {
+                    String aResponse = msg.getData().getString("response");
+                    Log.d("TAG_D", aResponse);
+                    if (aResponse != null)
+                    callback.onResponse(aResponse);
+                    else callback.onResponse("Internal Error!");
+                }
+            };
+        };
+        thread.start();
     }
 }
