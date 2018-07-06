@@ -57,7 +57,8 @@ netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
 List<String> paths;
 //Add all the absolute path to the list paths and do the next step to upload them e.g. /storage/emulated/0/DCIM/Camera/imagefile.jpg
 //Context is the application context e.g. MainActivity.this
-netObjexServices.bulkUpload(context, paths, new NetObjexWSCallback() {
+//Username and password will be provided. Consult the admin
+netObjexServices.bulkUpload(context, username, password, paths, new NetObjexWSCallback() {
     @Override
     public void onResponse(String data) {
         //data is the response from server
