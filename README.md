@@ -38,6 +38,7 @@ import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 String TAG = "";
 String VALUE = "";
 
+//GET DATA
 NetObjexServices netObjex = new NetObjexServices(MQTT_SERVER_URI, MQTT_USERNAME, MQTT_PASSWORD, BASE_URL, PRIVATE_KEY, CLIENT_ID);
 netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
     @Override
@@ -49,6 +50,18 @@ netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
     @Override
     public void onError(String errorMsg) {
         
+    }
+});
+
+//UPLOAD FILES
+List<String> paths;
+//Add all the absolute path to the list paths and do the next step to upload them e.g. /storage/emulated/0/DCIM/Camera/imagefile.jpg
+//Context is the application context e.g. MainActivity.this
+netObjexServices.bulkUpload(context, paths, new NetObjexWSCallback() {
+    @Override
+    public void onResponse(String data) {
+        //data is the response from server
+        Log.d("TAG", data);
     }
 });
 ```
