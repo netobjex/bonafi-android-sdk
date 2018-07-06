@@ -72,11 +72,11 @@ public class NetObjexServices {
         callPostWS(context, TOKEN_ACTION, dataObject.toString(), callback);
     }
 
-    private synchronized void login(Context context, NetObjexWSCallback callback) {
+    private synchronized void login(Context context, String email, String password, NetObjexWSCallback callback) {
         JSONObject dataObject = new JSONObject();
         try {
-            dataObject.put("username", "mac@netobjex.com");
-            dataObject.put("password", "123456");
+            dataObject.put("username", email);
+            dataObject.put("password", password);
             dataObject.put("remember", true);
         } catch (JSONException e) {
             e.printStackTrace();
@@ -151,8 +151,8 @@ public class NetObjexServices {
                     HttpRequestBase httpCall = null;
                     if (type.equalsIgnoreCase("POST")) {
                         if (!isLogin)
-                        httpCall = new HttpPost(baseUrl + WEBSERVICE_URL + action);
-                        else httpCall = new HttpPost(baseUrl+TOKEN_ACTION);
+                            httpCall = new HttpPost(baseUrl + WEBSERVICE_URL + action);
+                        else httpCall = new HttpPost(baseUrl + TOKEN_ACTION);
                         if (requestedTag != null) {
                             StringEntity se;
                             se = new StringEntity(requestedTag, "UTF-8");
@@ -275,8 +275,8 @@ public class NetObjexServices {
         return id;
     }
 
-    public void bulkUpload(final Context context, final List<String> filesPath, final NetObjexWSCallback callback) {
-        login(context, new NetObjexWSCallback() {
+    public void bulkUpload(final Context context, String username, String password, final List<String> filesPath, final NetObjexWSCallback callback) {
+        login(context, username, password, new NetObjexWSCallback() {
             @Override
             public void onResponse(String data) {
                 if (data == null || !data.contains("token")) {
@@ -287,7 +287,7 @@ public class NetObjexServices {
                     JSONObject res = new JSONObject(data);
                     final String token = res.getString("token");
                     Log.d("TAG_D", token);
-                    Thread thread = new Thread(){
+                    Thread thread = new Thread() {
                         @Override
                         public void run() {
                             String responseStr = null;
@@ -297,7 +297,7 @@ public class NetObjexServices {
                                 File each = new File(path);
                                 files.add(each);
                             }
-                            final String WEBSERVICE_URL = baseUrl+"/api/files/upload?type=COUPON_IMAGE";
+                            final String WEBSERVICE_URL = baseUrl + "/api/files/upload?type=COUPON_IMAGE";
                             try {
                                 HttpClient client = new DefaultHttpClient();
                                 HttpParams params = client.getParams();
@@ -330,6 +330,7 @@ public class NetObjexServices {
                                 handler.sendMessage(msgObj);
                             }
                         }
+
                         @SuppressLint("HandlerLeak")
                         private final Handler handler = new Handler() {
                             public void handleMessage(Message msg) {
