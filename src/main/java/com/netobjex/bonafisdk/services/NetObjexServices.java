@@ -1,7 +1,6 @@
 package com.netobjex.bonafisdk.services;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
@@ -10,10 +9,8 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
-import org.apache.http.entity.mime.MultipartEntity;
-
-import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSCallback;
+import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 import com.netobjex.bonafisdk.model.TagModel;
 import com.netobjex.bonafisdk.utils.MQTTHelper;
 
@@ -25,7 +22,10 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.entity.mime.HttpMultipartMode;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.ByteArrayBody;
+import org.apache.http.entity.mime.content.ContentBody;
 import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpConnectionParams;
@@ -72,6 +72,18 @@ public class NetObjexServices {
         callPostWS(context, TOKEN_ACTION, dataObject.toString(), callback);
     }
 
+    private synchronized void login(Context context, NetObjexWSCallback callback) {
+        JSONObject dataObject = new JSONObject();
+        try {
+            dataObject.put("username", "mac@netobjex.com");
+            dataObject.put("password", "123456");
+            dataObject.put("remember", true);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        callPostWS(context, null, dataObject.toString(), callback, true);
+    }
+
     public synchronized void getData(final Context context, final String name, final String value, final NetObjexWSThread callback) {
         if (mqttServerUri != null && !mqttServerUri.contains(".netobjex.com")) {
             sendErrorCallback(callback, "Unrecognized MQTT Base Url");
@@ -109,18 +121,23 @@ public class NetObjexServices {
     }
 
     private void callPostWS(Context context, String apiURL, String token, NetObjexWSThread callback) {
-        callService(context, apiURL, null, false, callback, null, "GET", token);
+        callService(context, apiURL, null, false, callback, null, "GET", token, false);
     }
 
     private void callPostWS(Context context, String apiURL, String data, NetObjexWSCallback callback) {
-        callService(context, apiURL, data, true, null, callback, "POST", null);
+        callService(context, apiURL, data, true, null, callback, "POST", null, false);
     }
 
-    private void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSCallback tokenCallback, final String type, final String token) {
+    private void callPostWS(Context context, String apiURL, String data, NetObjexWSCallback callback, boolean isLogin) {
+        callService(context, apiURL, data, true, null, callback, "POST", null, isLogin);
+    }
+
+    private void callService(final Context context, final String action, final String requestedTag, final boolean isTokenRequest, final NetObjexWSThread callback, final NetObjexWSCallback tokenCallback, final String type, final String token, final boolean isLogin) {
         Thread callThread = new Thread() {
             @Override
             public void run() {
                 final String WEBSERVICE_URL = "/api/PublicAPI";
+                final String TOKEN_ACTION = "/api/users/authenticate";
                 final DefaultHttpClient httpClient = new DefaultHttpClient();
                 HttpParams params = httpClient.getParams();
                 HttpConnectionParams.setConnectionTimeout(params, 15000);
@@ -133,7 +150,9 @@ public class NetObjexServices {
                 try {
                     HttpRequestBase httpCall = null;
                     if (type.equalsIgnoreCase("POST")) {
+                        if (!isLogin)
                         httpCall = new HttpPost(baseUrl + WEBSERVICE_URL + action);
+                        else httpCall = new HttpPost(baseUrl+TOKEN_ACTION);
                         if (requestedTag != null) {
                             StringEntity se;
                             se = new StringEntity(requestedTag, "UTF-8");
@@ -256,65 +275,77 @@ public class NetObjexServices {
         return id;
     }
 
-    private void bulkUpload(final List<String> filesPath, final NetObjexWSCallback callback) {
-        Thread thread = new Thread(){
+    public void bulkUpload(final Context context, final List<String> filesPath, final NetObjexWSCallback callback) {
+        login(context, new NetObjexWSCallback() {
             @Override
-            public void run() {
-                String responseStr = null;
-                List<File> files = new ArrayList<>();
-                for (String path : filesPath) {
-                    Log.d("TAG_D", path);
-                    File each = new File(path);
-                    files.add(each);
+            public void onResponse(String data) {
+                if (data == null || !data.contains("token")) {
+                    callback.onResponse("Internal Error!");
+                    return;
                 }
-
-                final String WEBSERVICE_URL = "https://api.stg.netobjex.com/api/files/upload";
                 try {
-                    HttpClient client = new DefaultHttpClient();
-                    HttpPost post = new HttpPost(WEBSERVICE_URL);
-
-                    List<FileBody> fileBodies = new ArrayList<>();
-                    for (File file : files) {
-                        FileBody data = new FileBody(file);
-                        fileBodies.add(data);
-                    }
-
-                    MultipartEntity reqEntity = new MultipartEntity();
-
-                    for (FileBody bin : fileBodies) {
-                        reqEntity.addPart(bin.getFilename(), bin);
-                    }
-
-                    reqEntity.addPart("query", new StringBody("COUPON_IMAGE"));
-
-                    post.setEntity(reqEntity);
-                    HttpResponse response = client.execute(post);
-                    HttpEntity resEntity = response.getEntity();
-                    responseStr = EntityUtils.toString(resEntity);
-                    if (resEntity != null) {
-                        Log.i("TAG_D", responseStr);
-                    }
-                } catch (Exception ex) {
-                    Log.e("TAG_D", "error: " + ex.getMessage(), ex);
-                } finally {
-                    Message msgObj = handler.obtainMessage();
-                    Bundle b = new Bundle();
-                    b.putString("response", responseStr);
-                    msgObj.setData(b);
-                    handler.sendMessage(msgObj);
+                    JSONObject res = new JSONObject(data);
+                    final String token = res.getString("token");
+                    Log.d("TAG_D", token);
+                    Thread thread = new Thread(){
+                        @Override
+                        public void run() {
+                            String responseStr = null;
+                            List<File> files = new ArrayList<>();
+                            for (String path : filesPath) {
+                                Log.d("TAG_D", path);
+                                File each = new File(path);
+                                files.add(each);
+                            }
+                            final String WEBSERVICE_URL = baseUrl+"/api/files/upload?type=COUPON_IMAGE";
+                            try {
+                                HttpClient client = new DefaultHttpClient();
+                                HttpParams params = client.getParams();
+                                HttpConnectionParams.setConnectionTimeout(params, 1500000);
+                                HttpConnectionParams.setSoTimeout(params, 2000000);
+                                HttpPost post = new HttpPost(WEBSERVICE_URL);
+                                MultipartEntity reqEntity = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE);
+                                for (File file : files) {
+                                    byte bytes[] = new byte[(int) file.length()];
+                                    ContentBody contentPart = new ByteArrayBody(bytes, "image/jpeg", file.getName());
+                                    reqEntity.addPart(file.getName(), contentPart);
+                                }
+                                reqEntity.addPart("userId", new StringBody(clientId));
+                                post.setEntity(reqEntity);
+                                post.setHeader("X-Auth-Key", token);
+                                post.setHeader("X-API-AUTH-KEY", privateKey);
+                                HttpResponse response = client.execute(post);
+                                HttpEntity resEntity = response.getEntity();
+                                responseStr = EntityUtils.toString(resEntity);
+                                if (resEntity != null) {
+                                    Log.i("TAG_D", responseStr);
+                                }
+                            } catch (Exception ex) {
+                                Log.e("TAG_D", "error: " + ex.getMessage(), ex);
+                            } finally {
+                                Message msgObj = handler.obtainMessage();
+                                Bundle b = new Bundle();
+                                b.putString("response", responseStr);
+                                msgObj.setData(b);
+                                handler.sendMessage(msgObj);
+                            }
+                        }
+                        @SuppressLint("HandlerLeak")
+                        private final Handler handler = new Handler() {
+                            public void handleMessage(Message msg) {
+                                String aResponse = msg.getData().getString("response");
+                                if (aResponse != null) {
+                                    Log.d("TAG_D", aResponse);
+                                    callback.onResponse(aResponse);
+                                } else callback.onResponse("Internal Error!");
+                            }
+                        };
+                    };
+                    thread.start();
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
             }
-            @SuppressLint("HandlerLeak")
-            private final Handler handler = new Handler() {
-                public void handleMessage(Message msg) {
-                    String aResponse = msg.getData().getString("response");
-                    Log.d("TAG_D", aResponse);
-                    if (aResponse != null)
-                    callback.onResponse(aResponse);
-                    else callback.onResponse("Internal Error!");
-                }
-            };
-        };
-        thread.start();
+        });
     }
 }
