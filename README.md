@@ -25,7 +25,6 @@ In manifest
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
-<service android:name="org.eclipse.paho.android.service.MqttService" />
 
 ```
 Then
@@ -39,7 +38,7 @@ String TAG = "";
 String VALUE = "";
 
 //GET DATA
-NetObjexServices netObjex = new NetObjexServices(MQTT_SERVER_URI, MQTT_USERNAME, MQTT_PASSWORD, BASE_URL, PRIVATE_KEY, CLIENT_ID);
+NetObjexServices netObjex = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
 netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
     @Override
     public void onFinish(boolean isFound, TagModel data) {
