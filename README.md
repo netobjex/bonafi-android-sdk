@@ -34,8 +34,8 @@ import com.netobjex.bonafisdk.model.TagModel;
 import com.netobjex.bonafisdk.services.NetObjexServices;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 
-String TAG = "";
-String VALUE = "";
+String TAG = “attributeName”;
+String VALUE = "attributeValue";
 
 //GET DATA
 NetObjexServices netObjex = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
