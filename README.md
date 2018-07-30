@@ -25,7 +25,6 @@ In manifest
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
-<service android:name="org.eclipse.paho.android.service.MqttService" />
 
 ```
 Then
@@ -35,11 +34,11 @@ import com.netobjex.bonafisdk.model.TagModel;
 import com.netobjex.bonafisdk.services.NetObjexServices;
 import com.netobjex.bonafisdk.interfaces.NetObjexWSThread;
 
-String TAG = "";
-String VALUE = "";
+String TAG = “attributeName”;
+String VALUE = "attributeValue";
 
 //GET DATA
-NetObjexServices netObjex = new NetObjexServices(MQTT_SERVER_URI, MQTT_USERNAME, MQTT_PASSWORD, BASE_URL, PRIVATE_KEY, CLIENT_ID);
+NetObjexServices netObjex = new NetObjexServices(BASE_URL, PRIVATE_KEY, CLIENT_ID);
 netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
     @Override
     public void onFinish(boolean isFound, TagModel data) {
@@ -52,20 +51,6 @@ netObjex.getData(this, TAG,VALUE, new NetObjexWSThread() {
         
     }
 });
-
-//UPLOAD FILES
-List<String> paths;
-//Add all the absolute path to the list paths and do the next step to upload them e.g. /storage/emulated/0/DCIM/Camera/imagefile.jpg
-//Context is the application context e.g. MainActivity.this
-//Username and password will be provided. Consult the admin
-netObjexServices.bulkUpload(context, username, password, paths, new NetObjexWSCallback() {
-    @Override
-    public void onResponse(String data) {
-        //data is the response from server
-        Log.d("TAG", data);
-    }
-});
-```
 
 ## Prerequisites
 
